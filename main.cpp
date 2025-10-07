@@ -20,7 +20,7 @@ Vector3 Normalize(const Vector3& v)
     return { v.x / len, v.y / len, v.z / len };
 }
 
-// 任意軸回転行列作成
+// 任意軸回転行列
 Matrix4x4 MakeRotateAxisAngle(const Vector3 axis, float angle)
 {
     Vector3 a = Normalize(axis);
