@@ -70,8 +70,8 @@ static inline Vector3 AnyPerpendicular(Vector3 v)
     if (ax <= ay && ax <= az)
         return Normalize(Vector3 { 0.0f, -v.z, v.y });
     if (ay <= az)
-        return Normalize(Vector3 { -v.z, 0.0f, v.x });
-    return Normalize(Vector3 { -v.y, v.x, 0.0f });
+        return Normalize(Vector3 { -v.y, 0.0f, v.x });
+    return Normalize(Vector3 { -v.z, v.x, 0.0f });
 }
 
 // 回転行列
@@ -108,13 +108,13 @@ static inline Matrix4x4 DirectionToDirection(Vector3 from, Vector3 to)
     Matrix4x4 R = Identity();
 
     R.m[0][0] += 0;
-    R.m[0][1] += -vz;
-    R.m[0][2] += vy;
-    R.m[1][0] += vz;
+    R.m[0][1] += vz;
+    R.m[0][2] += -vy;
+    R.m[1][0] += -vz;
     R.m[1][1] += 0;
-    R.m[1][2] += -vx;
-    R.m[2][0] += -vy;
-    R.m[2][1] += vx;
+    R.m[1][2] += vx;
+    R.m[2][0] += vy;
+    R.m[2][1] += -vx;
     R.m[2][2] += 0;
 
     float K2[3][3];
@@ -161,7 +161,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     Vector3 to0 = Vector3 { -from0.x, -from0.y, -from0.z };
     Vector3 to1 = Normalize(Vector3 { 0.4f, 0.7f, -0.5f });
 
-    Matrix4x4 rotateMatrix0 = DirectionToDirection(Vector3 { 1, 0, 0 }, Vector3 { -1, 0, 0 });
+    Matrix4x4 rotateMatrix0 = DirectionToDirection(Normalize(Vector3 { 1.0f, 0.0f, 0.0f }), Normalize(Vector3 { -1.0f, 0.0f, 0.0f }));
     Matrix4x4 rotateMatrix1 = DirectionToDirection(from0, to0);
     Matrix4x4 rotateMatrix2 = DirectionToDirection(from1, to1);
 
