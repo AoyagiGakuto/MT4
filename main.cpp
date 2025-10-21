@@ -106,9 +106,13 @@ Matrix4x4 DirectionToDirection(const Vector3 fromRaw, const Vector3 toRaw)
         return Identity();
 
     if (std::fabs(d + 1.0f) < EPS) {
-        Vector3 helper = (std::fabs(from.x) < 0.5f) ? Vector3 { 1, 0, 0 }
-            : (std::fabs(from.y) < 0.5f)            ? Vector3 { 0, 1, 0 }
-                                                    : Vector3 { 0, 0, 1 };
+        Vector3 helper;
+        if (std::fabs(from.x) >= std::fabs(from.y) && std::fabs(from.x) >= std::fabs(from.z)) {
+            helper = Vector3 { 0, 0, 1 };
+        } else {
+            helper = Vector3 { 1, 0, 0 };
+        }
+
         Vector3 axis = Normalize(Cross(from, helper));
         return MakeRotateAxisAngle(axis, (float)M_PI);
     }
