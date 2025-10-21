@@ -87,7 +87,7 @@ Matrix4x4 MakeRotateAxisAngle(const Vector3 axis, float angle)
     return result;
 }
 
-// ---- 本体：from方向→to方向へ回す回転行列 ----
+// 回転行列
 Matrix4x4 DirectionToDirection(const Vector3 fromRaw, const Vector3 toRaw)
 {
     const float EPS = 1e-6f;
