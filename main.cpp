@@ -1,34 +1,46 @@
 #include <Novice.h>
 #include <cmath>
-#include <cstring>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
 #endif
 
+// ベクトル
 struct Vector3 {
     float x, y, z;
 };
+
+// 4x4行列
 struct Matrix4x4 {
     float m[4][4];
 };
 
-// ---- math helpers ----
-static inline float LengthSq(const Vector3& v) { return v.x * v.x + v.y * v.y + v.z * v.z; }
-static inline float Length(const Vector3& v) { return std::sqrt(LengthSq(v)); }
-
-static inline Vector3 Normalize(const Vector3& v)
+// 正規化
+Vector3 Normalize(const Vector3& v)
 {
-    float len = Length(v);
-    if (len <= 1e-8f)
-        return { 0, 0, 0 };
+    float len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (len == 0.0f)
+        return { 0.0f, 0.0f, 0.0f };
     return { v.x / len, v.y / len, v.z / len };
 }
 
-static inline float Dot(const Vector3& a, const Vector3& b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
+static inline Vector3 operator-(const Vector3& v)
+{
+    return { -v.x, -v.y, -v.z };
+}
+
+static inline float Dot(const Vector3& a, const Vector3& b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
 static inline Vector3 Cross(const Vector3& a, const Vector3& b)
 {
-    return { a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x };
+    return Vector3 {
+        a.y * b.z - a.z * b.y,
+        a.z * b.x - a.x * b.z,
+        a.x * b.y - a.y * b.x
+    };
 }
 
 static inline Matrix4x4 Identity()
@@ -38,146 +50,146 @@ static inline Matrix4x4 Identity()
     return I;
 }
 
-// 任意軸回転
-static inline Matrix4x4 MakeRotateAxisAngle(Vector3 axis, float angle)
+// 任意軸回転行列
+Matrix4x4 MakeRotateAxisAngle(const Vector3 axis, float angle)
 {
-    axis = Normalize(axis);
-    float x = axis.x, y = axis.y, z = axis.z;
-    float c = std::cos(angle), s = std::sin(angle), oneMinusC = 1.0f - c;
+    Vector3 a = Normalize(axis);
+    float x = a.x;
+    float y = a.y;
+    float z = a.z;
 
-    Matrix4x4 r {};
-    r.m[0][0] = c + x * x * oneMinusC;
-    r.m[0][1] = x * y * oneMinusC + z * s;
-    r.m[0][2] = x * z * oneMinusC - y * s;
-    r.m[0][3] = 0;
-    r.m[1][0] = y * x * oneMinusC - z * s;
-    r.m[1][1] = c + y * y * oneMinusC;
-    r.m[1][2] = y * z * oneMinusC + x * s;
-    r.m[1][3] = 0;
-    r.m[2][0] = z * x * oneMinusC + y * s;
-    r.m[2][1] = z * y * oneMinusC - x * s;
-    r.m[2][2] = c + z * z * oneMinusC;
-    r.m[2][3] = 0;
-    r.m[3][0] = r.m[3][1] = r.m[3][2] = 0;
-    r.m[3][3] = 1;
-    return r;
+    float c = std::cos(angle);
+    float s = std::sin(angle);
+    float oneMinusC = 1.0f - c;
+
+    Matrix4x4 result {};
+
+    result.m[0][0] = c + oneMinusC * x * x;
+    result.m[0][1] = oneMinusC * x * y + s * z;
+    result.m[0][2] = oneMinusC * x * z - s * y;
+    result.m[0][3] = 0.0f;
+
+    result.m[1][0] = oneMinusC * y * x - s * z;
+    result.m[1][1] = c + oneMinusC * y * y;
+    result.m[1][2] = oneMinusC * y * z + s * x;
+    result.m[1][3] = 0.0f;
+
+    result.m[2][0] = oneMinusC * z * x + s * y;
+    result.m[2][1] = oneMinusC * z * y - s * x;
+    result.m[2][2] = c + oneMinusC * z * z;
+    result.m[2][3] = 0.0f;
+
+    result.m[3][0] = 0.0f;
+    result.m[3][1] = 0.0f;
+    result.m[3][2] = 0.0f;
+    result.m[3][3] = 1.0f;
+
+    return result;
 }
 
-static inline Vector3 AnyPerpendicular(Vector3 v)
-{
-    v = Normalize(v);
-    float ax = fabsf(v.x), ay = fabsf(v.y), az = fabsf(v.z);
-    if (ax <= ay && ax <= az)
-        return Normalize(Vector3 { 0.0f, -v.z, v.y });
-    if (az <= ay)
-        return Normalize(Vector3 { -v.y, v.x, 0.0f });
-   return Normalize(Vector3 { -v.z, 0.0f, v.x });
-}
-
-// 回転行列
-static inline Matrix4x4 DirectionToDirection(Vector3 from, Vector3 to)
+// ---- 本体：from方向→to方向へ回す回転行列 ----
+Matrix4x4 DirectionToDirection(const Vector3 fromRaw, const Vector3 toRaw)
 {
     const float EPS = 1e-6f;
-    if (Length(from) < EPS || Length(to) < EPS)
+
+    Vector3 from = Normalize(fromRaw);
+    Vector3 to = Normalize(toRaw);
+    if (from.x == 0 && from.y == 0 && from.z == 0)
         return Identity();
-    from = Normalize(from);
-    to = Normalize(to);
-
-    float c = Dot(from, to); // cosθ
-    c = (c > 1.0f) ? 1.0f : (c < -1.0f ? -1.0f : c);
-
-    if (fabsf(c - 1.0f) < EPS)
+    if (to.x == 0 && to.y == 0 && to.z == 0)
         return Identity();
 
-    if (fabsf(c + 1.0f) < EPS) {
-        Vector3 axis = AnyPerpendicular(from);
+    float d = Dot(from, to);
+    d = (d > 1.0f) ? 1.0f : (d < -1.0f ? -1.0f : d);
+
+    if (std::fabs(d - 1.0f) < EPS)
+        return Identity();
+
+    if (std::fabs(d + 1.0f) < EPS) {
+        Vector3 helper = (std::fabs(from.x) < 0.5f) ? Vector3 { 1, 0, 0 }
+            : (std::fabs(from.y) < 0.5f)            ? Vector3 { 0, 1, 0 }
+                                                    : Vector3 { 0, 0, 1 };
+        Vector3 axis = Normalize(Cross(from, helper));
         return MakeRotateAxisAngle(axis, (float)M_PI);
     }
 
-    Vector3 v = Cross(from, to);
-    float s2 = LengthSq(v);
-    float k = (1.0f - c) / s2;
-
-    float vx = v.x, vy = v.y, vz = v.z;
-    float K[3][3] = {
-        { 0, -vz, vy },
-        { vz, 0, -vx },
-        { -vy, vx, 0 }
-    };
-
-    Matrix4x4 R = Identity();
-
-    R.m[0][0] += 0;
-    R.m[0][1] += vz;
-    R.m[0][2] += -vy;
-    R.m[1][0] += -vz;
-    R.m[1][1] += 0;
-    R.m[1][2] += vx;
-    R.m[2][0] += vy;
-    R.m[2][1] += -vx;
-    R.m[2][2] += 0;
-
-    float K2[3][3];
-
-    K2[0][0] = -(vy * vy + vz * vz);
-    K2[0][1] = vx * vy;
-    K2[0][2] = vx * vz;
-    K2[1][0] = vx * vy;
-    K2[1][1] = -(vx * vx + vz * vz);
-    K2[1][2] = vy * vz;
-    K2[2][0] = vx * vz;
-    K2[2][1] = vy * vz;
-    K2[2][2] = -(vx * vx + vy * vy);
-
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            R.m[i][j] += K2[i][j] * k;
-        }
-    }
-    return R;
+    Vector3 axis = Cross(from, to);
+    float angle = std::acos(d);
+    return MakeRotateAxisAngle(axis, angle);
 }
 
-static inline void MatrixScreenPrintf(int x, int y, const Matrix4x4& m, const char* label)
+void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* label)
 {
     Novice::ScreenPrintf(x, y, "%s", label);
+
     for (int i = 0; i < 4; i++) {
-        Novice::ScreenPrintf(x, y + 20 + i * 20,
-            "%7.3f %7.3f %7.3f %7.3f",
-            m.m[i][0], m.m[i][1], m.m[i][2], m.m[i][3]);
+        Novice::ScreenPrintf(x, y + 20 + i * 20, "%7.3f %7.3f %7.3f %7.3f",
+            matrix.m[i][0], matrix.m[i][1],
+            matrix.m[i][2], matrix.m[i][3]);
     }
 }
 
 const char kWindowTitle[] = "LE2C_01_アオヤギ_ガクト_MT4";
 
+// Windowsアプリでのエントリーポイント(main関数)
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+
+    // ライブラリの初期化
     Novice::Initialize(kWindowTitle, 1280, 720);
 
-    char keys[256] {}, preKeys[256] {};
-    const int kRowHeight = 20;
+    // キー入力結果を受け取る箱
+    char keys[256] = { 0 };
+    char preKeys[256] = { 0 };
 
     Vector3 from0 = Normalize(Vector3 { 1.0f, 0.7f, 0.5f });
+    Vector3 to0 = -from0;
     Vector3 from1 = Normalize(Vector3 { -0.6f, 0.9f, 0.2f });
-    Vector3 to0 = Vector3 { -from0.x, -from0.y, -from0.z };
     Vector3 to1 = Normalize(Vector3 { 0.4f, 0.7f, -0.5f });
-
-    Matrix4x4 rotateMatrix0 = DirectionToDirection(Normalize(Vector3 { 1.0f, 0.0f, 0.0f }), Normalize(Vector3 { -1.0f, 0.0f, 0.0f }));
+    Matrix4x4 rotateMatrix0 = DirectionToDirection(
+        Normalize(Vector3 { 1.0f, 0.0f, 0.0f }), Normalize(Vector3 { -1.0f, 0.0f, 0.0f }));
     Matrix4x4 rotateMatrix1 = DirectionToDirection(from0, to0);
     Matrix4x4 rotateMatrix2 = DirectionToDirection(from1, to1);
+    int kRowHeight = 20;
 
+    // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
+        // フレームの開始
         Novice::BeginFrame();
-        std::memcpy(preKeys, keys, 256);
+
+        // キー入力を受け取る
+        memcpy(preKeys, keys, 256);
         Novice::GetHitKeyStateAll(keys);
+
+        ///
+        /// ↓更新処理ここから
+        ///
+
+        ///
+        /// ↑更新処理ここまで
+        ///
+
+        ///
+        /// ↓描画処理ここから
+        ///
 
         MatrixScreenPrintf(0, 0, rotateMatrix0, "rotateMatrix0");
         MatrixScreenPrintf(0, kRowHeight * 5, rotateMatrix1, "rotateMatrix1");
         MatrixScreenPrintf(0, kRowHeight * 10, rotateMatrix2, "rotateMatrix2");
+        ///
+        /// ↑描画処理ここまで
+        ///
 
+        // フレームの終了
         Novice::EndFrame();
-        if (preKeys[DIK_ESCAPE] == 0 && keys[DIK_ESCAPE] != 0)
+
+        // ESCキーが押されたらループを抜ける
+        if (preKeys[DIK_ESCAPE] == 0 && keys[DIK_ESCAPE] != 0) {
             break;
+        }
     }
+
+    // ライブラリの終了
     Novice::Finalize();
     return 0;
 }
