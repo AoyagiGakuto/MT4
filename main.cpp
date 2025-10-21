@@ -69,9 +69,9 @@ static inline Vector3 AnyPerpendicular(Vector3 v)
     float ax = fabsf(v.x), ay = fabsf(v.y), az = fabsf(v.z);
     if (ax <= ay && ax <= az)
         return Normalize(Vector3 { 0.0f, -v.z, v.y });
-    if (ay <= az)
-        return Normalize(Vector3 { -v.y, 0.0f, v.x });
-    return Normalize(Vector3 { -v.z, v.x, 0.0f });
+    if (az <= ay)
+        return Normalize(Vector3 { -v.y, v.x, 0.0f });
+   return Normalize(Vector3 { -v.z, 0.0f, v.x });
 }
 
 // 回転行列
