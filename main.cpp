@@ -1,5 +1,7 @@
 #include <Novice.h>
 #include <cmath>
+#include <iomanip>
+#include <iostream>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846f
@@ -14,6 +16,68 @@ struct Vector3 {
 struct Matrix4x4 {
     float m[4][4];
 };
+
+struct Quaternion {
+    float x;
+    float y;
+    float z;
+    float w;
+};
+
+// 積
+Quaternion Multiply(const Quaternion& lhs, const Quaternion& rhs)
+{
+    Quaternion out;
+    float v1x = lhs.x, v1y = lhs.y, v1z = lhs.z, w1 = lhs.w;
+    float v2x = rhs.x, v2y = rhs.y, v2z = rhs.z, w2 = rhs.w;
+
+    out.w = w1 * w2 - (v1x * v2x + v1y * v2y + v1z * v2z);
+
+    out.x = w1 * v2x + w2 * v1x + (v1y * v2z - v1z * v2y);
+    out.y = w1 * v2y + w2 * v1y + (v1z * v2x - v1x * v2z);
+    out.z = w1 * v2z + w2 * v1z + (v1x * v2y - v1y * v2x);
+
+    return out;
+}
+
+// 単位
+Quaternion IdentityQuaternion()
+{
+    return Quaternion { 0.0f, 0.0f, 0.0f, 1.0f };
+}
+
+Quaternion Conjugate(const Quaternion& q)
+{
+    return Quaternion { -q.x, -q.y, -q.z, q.w };
+}
+
+// 長さ
+float Norm(const Quaternion& q)
+{
+    return std::sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+}
+
+// 正規化
+Quaternion Normalize(const Quaternion& q)
+{
+    float n = Norm(q);
+    if (n == 0.0f) {
+        return IdentityQuaternion();
+    }
+    float inv = 1.0f / n;
+    return Quaternion { q.x * inv, q.y * inv, q.z * inv, q.w * inv };
+}
+
+Quaternion Inverse(const Quaternion& q)
+{
+    float norm2 = q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w;
+    if (norm2 == 0.0f) {
+        return IdentityQuaternion();
+    }
+    Quaternion conj = Conjugate(q);
+    float inv = 1.0f / norm2;
+    return Quaternion { conj.x * inv, conj.y * inv, conj.z * inv, conj.w * inv };
+}
 
 // 正規化
 Vector3 Normalize(const Vector3& v)
@@ -133,6 +197,13 @@ void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix, const char* label
     }
 }
 
+void ScreenPrintfQuaternion(int x, int y, const char* label, const Quaternion& q)
+{
+    Novice::ScreenPrintf(x, y, "%s", label);
+    Novice::ScreenPrintf(x + 260, y, "%7.2f %7.2f %7.2f %7.2f",
+        q.x, q.y, q.z, q.w);
+}
+
 const char kWindowTitle[] = "LE2C_01_アオヤギ_ガクト_MT4";
 
 // Windowsアプリでのエントリーポイント(main関数)
@@ -146,15 +217,21 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
 
-    Vector3 from0 = Normalize(Vector3 { 1.0f, 0.7f, 0.5f });
-    Vector3 to0 = -from0;
-    Vector3 from1 = Normalize(Vector3 { -0.6f, 0.9f, 0.2f });
-    Vector3 to1 = Normalize(Vector3 { 0.4f, 0.7f, -0.5f });
-    Matrix4x4 rotateMatrix0 = DirectionToDirection(
-        Normalize(Vector3 { 1.0f, 0.0f, 0.0f }), Normalize(Vector3 { -1.0f, 0.0f, 0.0f }));
-    Matrix4x4 rotateMatrix1 = DirectionToDirection(from0, to0);
-    Matrix4x4 rotateMatrix2 = DirectionToDirection(from1, to1);
-    int kRowHeight = 20;
+    Quaternion q1 = { 2.0f, 3.0f, 4.0f, 1.0f };
+    Quaternion q2 = { 1.0f, 3.0f, 5.0f, 2.0f };
+
+    Quaternion identity = IdentityQuaternion();
+    Quaternion conj = Conjugate(q1);
+    Quaternion inv = Inverse(q1);
+    Quaternion normal = Normalize(q1);
+    Quaternion mul1 = Multiply(q1, q2);
+    Quaternion mul2 = Multiply(q2, q1);
+    float norm = Norm(q1);
+
+    // int kRowHeight = 20;
+    int row = 20;
+    int startXLabel = 20;
+    int startY = 20;
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -177,9 +254,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         /// ↓描画処理ここから
         ///
 
-        MatrixScreenPrintf(0, 0, rotateMatrix0, "rotateMatrix0");
-        MatrixScreenPrintf(0, kRowHeight * 5, rotateMatrix1, "rotateMatrix1");
-        MatrixScreenPrintf(0, kRowHeight * 10, rotateMatrix2, "rotateMatrix2");
+        // 描画
+        ScreenPrintfQuaternion(startXLabel, startY + row * 0, "Identity :", identity);
+        ScreenPrintfQuaternion(startXLabel, startY + row * 1, "Conjugate:", conj);
+        ScreenPrintfQuaternion(startXLabel, startY + row * 2, "Inverse  :", inv);
+        ScreenPrintfQuaternion(startXLabel, startY + row * 3, "Normalize:", normal);
+        ScreenPrintfQuaternion(startXLabel, startY + row * 4, "Multiply(q1,q2):", mul1);
+        ScreenPrintfQuaternion(startXLabel, startY + row * 5, "Multiply(q2,q1):", mul2);
+
+        Novice::ScreenPrintf(startXLabel, startY + row * 7, "Norm(q1) : %7.2f", norm);
+
         ///
         /// ↑描画処理ここまで
         ///
