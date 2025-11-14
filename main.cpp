@@ -186,7 +186,7 @@ Matrix4x4 DirectionToDirection(const Vector3 fromRaw, const Vector3 toRaw)
     return MakeRotateAxisAngle(axis, angle);
 }
 
-// 任意軸回転クォタニオンの生成
+// 任意軸回転をクォタニオンの生成
 Quaternion MakeRotateAxisAngleQuaternion(const Vector3& axis, float angle)
 {
     Vector3 a = Normalize(axis);
@@ -196,7 +196,7 @@ Quaternion MakeRotateAxisAngleQuaternion(const Vector3& axis, float angle)
     return Quaternion { a.x * s, a.y * s, a.z * s, c };
 }
 
-// ベクトルをクォータニオンで回転させた結果を返す
+// ベクトルをクォ-ータニオンで回転させた結果を返す
 Vector3 RotateVector(const Vector3& vector, const Quaternion& quaternion)
 {
     Quaternion q = Normalize(quaternion); 
