@@ -6,9 +6,8 @@ struct Vector3 {
     float x, y, z;
 };
 
-// 4x4行列
-struct Matrix4x4 {
-    float m[4][4];
+struct Quaternion {
+    float x, y, z, w;
 };
 
 // 正規化
@@ -21,53 +20,49 @@ Vector3 Normalize(const Vector3& v)
 }
 
 // 任意軸回転行列
-Matrix4x4 MakeRotateAxisAngle(const Vector3 axis, float angle)
+Quaternion MakeRotateAxisAngleQuaternion(const Vector3& axis, float angle)
 {
-    Vector3 a = Normalize(axis);
-    float x = a.x;
-    float y = a.y;
-    float z = a.z;
+    Vector3 n = axis;
 
-    float c = std::cos(angle);
-    float s = std::sin(angle);
-    float oneMinusC = 1.0f - c;
-
-    Matrix4x4 result {};
-
-    result.m[0][0] = c + oneMinusC * x * x;
-    result.m[0][1] = oneMinusC * x * y + s * z;
-    result.m[0][2] = oneMinusC * x * z - s * y;
-    result.m[0][3] = 0.0f;
-
-    result.m[1][0] = oneMinusC * y * x - s * z;
-    result.m[1][1] = c + oneMinusC * y * y;
-    result.m[1][2] = oneMinusC * y * z + s * x;
-    result.m[1][3] = 0.0f;
-
-    result.m[2][0] = oneMinusC * z * x + s * y;
-    result.m[2][1] = oneMinusC * z * y - s * x;
-    result.m[2][2] = c + oneMinusC * z * z;
-    result.m[2][3] = 0.0f;
-
-    result.m[3][0] = 0.0f;
-    result.m[3][1] = 0.0f;
-    result.m[3][2] = 0.0f;
-    result.m[3][3] = 1.0f;
-
-    return result;
+    float sinHalf = std::sin(angle / 2.0f);
+    float cosHalf = std::cos(angle / 2.0f);
+    return { n.x * sinHalf, n.y * sinHalf, n.z * sinHalf, cosHalf };
 }
 
-void MatrixScreenPrintf(int x, int y, const Matrix4x4& matrix,const char*label)
+Quaternion Slerp(const Quaternion& q0, const Quaternion& q1, float t)
 {
-    Novice::ScreenPrintf(x, y, "%s",label);
+    float dot = q0.x * q1.x + q0.y * q1.y + q0.z * q1.z + q0.w * q1.w;
 
-    for (int i = 0; i < 4; i++) {
-        Novice::ScreenPrintf(x, y + 20 + i * 20, "%7.3f %7.3f %7.3f %7.3f",
-            matrix.m[i][0], matrix.m[i][1],
-            matrix.m[i][2], matrix.m[i][3]);
+    Quaternion q1_adjusted = q1;
+
+    if (dot < 0.0f) {
+        q1_adjusted = { -q1.x, -q1.y, -q1.z, -q1.w };
+        dot = -dot;
     }
+
+    float theta = std::acos(dot);
+    float sinTheta = std::sin(theta);
+    float scale0 = std::sin((1.0f - t) * theta) / sinTheta;
+    float scale1 = std::sin(t * theta) / sinTheta;
+
+    if (sinTheta < 0.001f) {
+        scale0 = 1.0f - t;
+        scale1 = t;
+    }
+    return {
+        scale0 * q0.x + scale1 * q1_adjusted.x,
+        scale0 * q0.y + scale1 * q1_adjusted.y,
+        scale0 * q0.z + scale1 * q1_adjusted.z,
+        scale0 * q0.w + scale1 * q1_adjusted.w
+    };
 }
 
+// クォータニオンの数値を画面表示する関数
+void QuaternionScreenPrintf(int x, int y, const Quaternion& q, const char* label)
+{
+    Novice::ScreenPrintf(x, y, "%4.2f  %4.2f  %4.2f  %4.2f  : %s",
+        q.x, q.y, q.z, q.w, label);
+}
 
 const char kWindowTitle[] = "LE2C_01_アオヤギ_ガクト_MT4";
 
@@ -82,9 +77,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     char keys[256] = { 0 };
     char preKeys[256] = { 0 };
 
-     Vector3 axis = Normalize({ 1.0f, 1.0f, 1.0f });
-    float angle = 0.44f;
-    Matrix4x4 rotateMatrix = MakeRotateAxisAngle(axis, angle);
+    // 2つの回転クォータニオンを生成
+    Quaternion rotation0 = MakeRotateAxisAngleQuaternion({ 0.71f, 0.71f, 0.0f }, 0.3f);
+    Quaternion rotation1 = MakeRotateAxisAngleQuaternion({ 0.71f, 0.0f, 0.71f }, 3.141592f);
+
+    // Slerpで補間
+    Quaternion interpolate0 = Slerp(rotation0, rotation1, 0.0f);
+    Quaternion interpolate1 = Slerp(rotation0, rotation1, 0.3f);
+    Quaternion interpolate2 = Slerp(rotation0, rotation1, 0.5f);
+    Quaternion interpolate3 = Slerp(rotation0, rotation1, 0.7f);
+    Quaternion interpolate4 = Slerp(rotation0, rotation1, 1.0f);
 
     // ウィンドウの×ボタンが押されるまでループ
     while (Novice::ProcessMessage() == 0) {
@@ -106,8 +108,16 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
         ///
         /// ↓描画処理ここから
         ///
-        
-        MatrixScreenPrintf(0, 0, rotateMatrix, "rotateMatrix");
+
+        int startX = 10;
+        int startY = 10;
+        int lineHeight = 20;
+
+        QuaternionScreenPrintf(startX, startY + lineHeight * 0, interpolate0, "interpolate0, Slerp(q0, q1, 0.0f)");
+        QuaternionScreenPrintf(startX, startY + lineHeight * 1, interpolate1, "interpolate1, Slerp(q0, q1, 0.3f)");
+        QuaternionScreenPrintf(startX, startY + lineHeight * 2, interpolate2, "interpolate2, Slerp(q0, q1, 0.5f)");
+        QuaternionScreenPrintf(startX, startY + lineHeight * 3, interpolate3, "interpolate3, Slerp(q0, q1, 0.7f)");
+        QuaternionScreenPrintf(startX, startY + lineHeight * 4, interpolate4, "interpolate4, Slerp(q0, q1, 1.0f)");
 
         ///
         /// ↑描画処理ここまで
